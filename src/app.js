@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
+import dayjs from "dayjs";
+import locale from "dayjs/locale/pt-br.js";
 
 dotenv.config();
 
@@ -41,13 +43,27 @@ app.post("/participants", async (req, res) => {
     const addedParticipant = await db
       .collection("participants")
       .insertOne({ name: name, lastStatus: Date.now() });
-    res.sendStatus(201);
   } catch (error) {
     return res.sendStatus(500);
   }
 
   //adc status de entrada
-  
+  try {
+    const now = dayjs().locale("pt-br").format("HH:mm:ss");
+    const statusMessage = {
+      from: name,
+      to: "Todos",
+      text: "entra na sala...",
+      type: "status",
+      time: now,
+    };
+    const addedParticipant = await db
+      .collection("messages")
+      .insertOne(statusMessage);
+      res.sendStatus(201);
+  } catch (error) {
+    return res.sendStatus(500);
+  }
 });
 
 app.get("/participants", async (req, res) => {
@@ -56,17 +72,27 @@ app.get("/participants", async (req, res) => {
       .collection("participants")
       .find()
       .toArray();
-    res.status(200).send(listOfParticipants);
+    return res.status(200).send(listOfParticipants);
   } catch (error) {
     return res.sendStatus(500);
   }
 });
 
-//POST /messages
+//POST /messages (FAZER)
 
-//GET /messages
+app.get("/messages", async (req, res) => {
+  try {
+    const listOfMessages = await db
+      .collection("messages")
+      .find()
+      .toArray();
+    return res.status(200).send(listOfMessages);
+  } catch (error) {
+    return res.sendStatus(500);
+  }
+});
 
-//POST /stayus
+//POST /stayus (FAZER)
 
 app.listen(5000, () => {
   console.log("Listening on Port 5000");
