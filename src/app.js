@@ -4,6 +4,7 @@ import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
 import dayjs from "dayjs";
 import locale from "dayjs/locale/pt-br.js";
+import joi from "joi";
 
 dotenv.config();
 
@@ -18,37 +19,26 @@ mongoClient.connect().then(() => {
   db = mongoClient.db("buzzquizz");
 });
 
+const messageSchema = joi.object({
+  from: joi.string().required().trim(),
+  to: joi.string().required().trim(),
+  text: joi.string().required(),
+  type: joi.string().required().valid("message", "private_message"),
+  time: joi.string().required(),
+});
+
 app.post("/participants", async (req, res) => {
   const { name } = req.body;
-  let listOfParticipants;
 
-  //testar se o nome e valido
   if (!name) {
     return res.status(422).send("Nome de usuário inválido!");
   }
 
-  //testar se já existe usuário com o mesmo nome
   try {
-    listOfParticipants = await db.collection("participants").find().toArray();
-  } catch (error) {
-    return res.sendStatus(500);
-  }
-
-  if (listOfParticipants.includes(name)) {
-    return res.status(409).send("Usuário já cadastrado!");
-  }
-
-  //adc na db o usuário
-  try {
-    const addedParticipant = await db
+    const listOfParticipants = await db
       .collection("participants")
-      .insertOne({ name: name, lastStatus: Date.now() });
-  } catch (error) {
-    return res.sendStatus(500);
-  }
-
-  //adc status de entrada
-  try {
+      .find()
+      .toArray();
     const now = dayjs().locale("pt-br").format("HH:mm:ss");
     const statusMessage = {
       from: name,
@@ -57,10 +47,24 @@ app.post("/participants", async (req, res) => {
       type: "status",
       time: now,
     };
+
+    if (
+      listOfParticipants.filter(
+        (val) => val.name.toLowerCase() === name.toLowerCase()
+      ).length > 0
+    ) {
+      return res.status(409).send("Usuário já cadastrado!");
+    }
+
     const addedParticipant = await db
+      .collection("participants")
+      .insertOne({ name: name, lastStatus: Date.now() });
+
+    const addedStatus = await db
       .collection("messages")
       .insertOne(statusMessage);
-      res.sendStatus(201);
+
+    res.sendStatus(201);
   } catch (error) {
     return res.sendStatus(500);
   }
@@ -78,17 +82,71 @@ app.get("/participants", async (req, res) => {
   }
 });
 
-//POST /messages (FAZER)
-
 app.get("/messages", async (req, res) => {
+  const limit = parseInt(req.query.limit);
+  const { user } = req.headers;
+
+  if (limit) {
+    try {
+      const listOfMessages = await db.collection("messages").find().toArray();
+      const filteredMessages = listOfMessages.reverse().filter((val, index) => {
+        if (index < limit && (val.to === user || val.to === "Todos")) {
+          return val;
+        }
+      });
+      return res.status(200).send(filteredMessages.reverse());
+    } catch (error) {
+      return res.sendStatus(500);
+    }
+  } else {
+    try {
+      const listOfMessages = await db.collection("messages").find().toArray();
+      const filteredMessages = listOfMessages.reverse().filter((val, index) => {
+        if (val.to === user || val.to === "Todos") {
+          return val;
+        }
+      });
+      return res.status(200).send(filteredMessages.reverse());
+    } catch (error) {
+      return res.sendStatus(500);
+    }
+  }
+});
+
+app.post("/messages", async (req, res) => {
+  const User = req.headers.user;
+  const { to, text, type } = req.body;
+  const now = dayjs().locale("pt-br").format("HH:mm:ss");
+  const templateMessage = {
+    from: User,
+    to: to,
+    text: text,
+    type: type,
+    time: now,
+  };
+  const validation = messageSchema.validate(templateMessage, {
+    abortEarly: false,
+  });
+
   try {
-    const listOfMessages = await db
-      .collection("messages")
+    const listOfParticipants = await db
+      .collection("participants")
       .find()
       .toArray();
-    return res.status(200).send(listOfMessages);
+
+    if (
+      listOfParticipants.filter(
+        (val) => val.name.toLowerCase() === name.toLowerCase()
+      ).length === 0
+    ) {
+      return res.status(409).send("Usuário já cadastrado!");
+    }
   } catch (error) {
     return res.sendStatus(500);
+  }
+
+  if (validation.error) {
+    return res.status(422).send(validation.error.details);
   }
 });
 
