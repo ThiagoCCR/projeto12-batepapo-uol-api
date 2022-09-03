@@ -1,24 +1,24 @@
 import express from "express";
 import cors from "cors";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 import dayjs from "dayjs";
 import locale from "dayjs/locale/pt-br.js";
 import joi from "joi";
 
 dotenv.config();
-
 const app = express();
 app.use(express.json());
 app.use(cors());
 
+//mongodb
 const mongoClient = new MongoClient(process.env.MONGO_URI);
-
 let db;
 mongoClient.connect().then(() => {
   db = mongoClient.db("buzzquizz");
 });
 
+//joi
 const messageSchema = joi.object({
   from: joi.string().required().trim(),
   to: joi.string().required().trim(),
@@ -66,6 +66,7 @@ app.post("/participants", async (req, res) => {
 
     res.sendStatus(201);
   } catch (error) {
+    console.log(error);
     return res.sendStatus(500);
   }
 });
@@ -108,6 +109,7 @@ app.get("/messages", async (req, res) => {
       });
       return res.status(200).send(filteredMessages.reverse());
     } catch (error) {
+      console.log(error);
       return res.sendStatus(500);
     }
   }
@@ -154,6 +156,7 @@ app.post("/messages", async (req, res) => {
 
     res.sendStatus(201);
   } catch (error) {
+    console.log(error);
     return res.sendStatus(500);
   }
 });
@@ -183,9 +186,38 @@ app.post("/status", async (req, res) => {
       .collection("participants")
       .insertOne({ name: username, lastStatus: Date.now() });
     res.sendStatus(200);
-  } catch (error) {}
+  } catch (error) {
+    console.log(error);
+  }
 });
 
+//deletar mensagem
+app.delete("/messages/:ID_DA_MENSAGEM", async (req, res) => {
+  const messageId = req.params.ID_DA_MENSAGEM;
+  const User = req.headers.user;
+
+  try {
+    const message = await db
+      .collection("messages")
+      .findOne({ _id: new ObjectId(messageId) });
+
+    if (!message) {
+      return res.sendStatus(404);
+    }
+
+    if (message.from !== User) {
+      return res.sendStatus(401);
+    }
+    console.log("oi");
+    await db.collection("messages").deleteOne({ _id: ObjectId(messageId) });
+    res.sendStatus(200);
+  } catch (error) {
+    console.log(error);
+    res.status(500).send("Erro no servidor");
+  }
+});
+
+//validar status dos usuários
 setInterval(async () => {
   const listOfParticipants = await db
     .collection("participants")
@@ -198,7 +230,7 @@ setInterval(async () => {
     try {
       const now = dayjs().locale("pt-br").format("HH:mm:ss");
       const messageTemplate = {
-        from: val.namee,
+        from: val.name,
         to: "Todos",
         text: "sai da sala...",
         type: "status",
@@ -206,9 +238,9 @@ setInterval(async () => {
       };
       await db.collection("participants").deleteOne(val);
       await db.collection("messages").insertOne(messageTemplate);
-      console.log("atualizei!")
+      console.log("atualizei!");
     } catch (error) {
-      console.log("Erro na validação de status...");
+      console.log(error);
     }
   });
 }, 15000);
