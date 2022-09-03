@@ -186,6 +186,33 @@ app.post("/status", async (req, res) => {
   } catch (error) {}
 });
 
+setInterval(async () => {
+  const listOfParticipants = await db
+    .collection("participants")
+    .find()
+    .toArray();
+  const listOfInactiveParticipants = listOfParticipants.filter(
+    (participant) => Date.now() - Number(participant.lastStatus) > 10000
+  );
+  listOfInactiveParticipants.map(async (val) => {
+    try {
+      const now = dayjs().locale("pt-br").format("HH:mm:ss");
+      const messageTemplate = {
+        from: val.namee,
+        to: "Todos",
+        text: "sai da sala...",
+        type: "status",
+        time: now,
+      };
+      await db.collection("participants").deleteOne(val);
+      await db.collection("messages").insertOne(messageTemplate);
+      console.log("atualizei!")
+    } catch (error) {
+      console.log("Erro na validação de status...");
+    }
+  });
+}, 15000);
+
 app.listen(5000, () => {
   console.log("Listening on Port 5000");
 });
