@@ -26,9 +26,23 @@ const messageSchema = joi.object({
   type: joi.string().required().valid("message", "private_message"),
   time: joi.string().required(),
 });
+const userSchema = joi.object({ name: joi.string().required().trim() });
 
 app.post("/participants", async (req, res) => {
   const { name } = req.body;
+
+  const validation = userSchema.validate(
+    { name: name },
+    {
+      abortEarly: false,
+    }
+  );
+
+  if (validation.error) {
+    return res
+      .status(422)
+      .send(validation.error.details.map((res) => res.message));
+  }
 
   if (!name) {
     return res.status(422).send("Nome de usuário inválido!");
@@ -208,7 +222,6 @@ app.delete("/messages/:ID_DA_MENSAGEM", async (req, res) => {
     if (message.from !== User) {
       return res.sendStatus(401);
     }
-    console.log("oi");
     await db.collection("messages").deleteOne({ _id: ObjectId(messageId) });
     res.sendStatus(200);
   } catch (error) {
@@ -238,7 +251,6 @@ setInterval(async () => {
       };
       await db.collection("participants").deleteOne(val);
       await db.collection("messages").insertOne(messageTemplate);
-      console.log("atualizei!");
     } catch (error) {
       console.log(error);
     }
