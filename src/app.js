@@ -28,6 +28,7 @@ const messageSchema = joi.object({
 });
 const userSchema = joi.object({ name: joi.string().required().trim() });
 
+//adicionar participantes
 app.post("/participants", async (req, res) => {
   const { name } = req.body;
 
@@ -85,6 +86,7 @@ app.post("/participants", async (req, res) => {
   }
 });
 
+//listar participantes
 app.get("/participants", async (req, res) => {
   try {
     const listOfParticipants = await db
@@ -97,6 +99,7 @@ app.get("/participants", async (req, res) => {
   }
 });
 
+//listar todas as mensagens
 app.get("/messages", async (req, res) => {
   const limit = parseInt(req.query.limit);
   const { user } = req.headers;
@@ -129,6 +132,7 @@ app.get("/messages", async (req, res) => {
   }
 });
 
+//postar mensagem
 app.post("/messages", async (req, res) => {
   const User = req.headers.user;
   const { to, text, type } = req.body;
@@ -175,6 +179,7 @@ app.post("/messages", async (req, res) => {
   }
 });
 
+//atualizar status
 app.post("/status", async (req, res) => {
   const username = req.headers.user;
 
@@ -256,6 +261,56 @@ setInterval(async () => {
     }
   });
 }, 15000);
+
+//atualizar mensagens
+app.put("/mesages/ID_DA_MENSAGEM", async (req, res) => {
+  const { to, text, type } = req.body;
+  const from = req.headers.user;
+  const messageId = req.params.ID_DA_MENSAGEM;
+
+  try {
+    const user = await db.collection("participants").findOne({ name: from });
+    const templateMessage = {
+      from: from,
+      to: to,
+      text: text,
+      type: type,
+    };
+    const validation = messageSchema.validate(templateMessage, {
+      abortEarly: false,
+    });
+
+    if (validation.error || !user) {
+      return res
+        .status(422)
+        .send(validation.error.details.map((res) => res.message));
+    }
+
+    const message = await db
+      .collection("messages")
+      .findOne({ _id: new ObjectId(messageId) });
+
+    if (!message) {
+      return res.status(404).send("Mensagem não encontrada!");
+    }
+
+    if (message.from !== from) {
+      return res.statusStatus(401);
+    }
+
+    await db.collection("messages").updateOne(
+      {
+        _id: messageId,
+      },
+      { $set: templateMessage }
+    );
+
+    res.sendStatus(200);
+
+  } catch (error) {
+    res.sendStatus(500);
+  }
+});
 
 app.listen(5000, () => {
   console.log("Listening on Port 5000");
