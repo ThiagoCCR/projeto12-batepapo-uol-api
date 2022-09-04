@@ -5,6 +5,8 @@ import dotenv from "dotenv";
 import dayjs from "dayjs";
 import locale from "dayjs/locale/pt-br.js";
 import joi from "joi";
+import { strict as assert } from "assert";
+import { stripHtml } from "string-strip-html";
 
 dotenv.config();
 const app = express();
@@ -30,7 +32,8 @@ const userSchema = joi.object({ name: joi.string().required().trim() });
 
 //adicionar participantes
 app.post("/participants", async (req, res) => {
-  const { name } = req.body;
+  let { name } = req.body;
+  name = stripHtml(name).result.trim();
 
   const validation = userSchema.validate(
     { name: name },
@@ -271,10 +274,10 @@ app.put("/mesages/ID_DA_MENSAGEM", async (req, res) => {
   try {
     const user = await db.collection("participants").findOne({ name: from });
     const templateMessage = {
-      from: from,
-      to: to,
-      text: text,
-      type: type,
+      from,
+      to,
+      text,
+      type,
     };
     const validation = messageSchema.validate(templateMessage, {
       abortEarly: false,
@@ -306,7 +309,6 @@ app.put("/mesages/ID_DA_MENSAGEM", async (req, res) => {
     );
 
     res.sendStatus(200);
-
   } catch (error) {
     res.sendStatus(500);
   }
