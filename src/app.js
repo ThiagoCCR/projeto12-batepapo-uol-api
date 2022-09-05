@@ -184,31 +184,27 @@ app.post("/messages", async (req, res) => {
 
 //atualizar status
 app.post("/status", async (req, res) => {
-  const username = req.headers.user;
+  const username = stripHtml(req.headers.user).result.trim();
 
   if (!username) {
     return res.sendStatus(422);
   }
 
   try {
-    const listOfParticipants = await db
+    const participant = await db
       .collection("participants")
-      .find()
-      .toArray();
+      .findOne({ name: username });
 
-    if (
-      listOfParticipants.filter(
-        (val) => val.name.toLowerCase() === username.toLowerCase()
-      ).length === 0
-    ) {
+    if (!participant) {
       return res.sendStatus(404);
     }
 
     const addedParticipant = await db
       .collection("participants")
-      .insertOne({ name: username, lastStatus: Date.now() });
+      .updateOne({ name: username }, { $set: { lastStatus: Date.now() } });
     res.sendStatus(200);
   } catch (error) {
+    res.sendStatus(500);
     console.log(error);
   }
 });
@@ -216,7 +212,7 @@ app.post("/status", async (req, res) => {
 //deletar mensagem
 app.delete("/messages/:ID_DA_MENSAGEM", async (req, res) => {
   const messageId = req.params.ID_DA_MENSAGEM;
-  const User = req.headers.user;
+  const User = stripHtml(req.headers.user).result.trim();
 
   try {
     const message = await db
