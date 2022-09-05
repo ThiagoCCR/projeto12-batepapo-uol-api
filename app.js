@@ -111,7 +111,7 @@ app.get("/messages", async (req, res) => {
     try {
       const listOfMessages = await db.collection("messages").find().toArray();
       const filteredMessages = listOfMessages.reverse().filter((val, index) => {
-        if (index <= limit && (val.to === user || val.to === "Todos")) {
+        if (index < limit && (val.to === user || val.to === "Todos")) {
           return val;
         }
       });
