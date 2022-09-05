@@ -7,8 +7,8 @@ import locale from "dayjs/locale/pt-br.js";
 import joi from "joi";
 import { strict as assert } from "assert";
 import { stripHtml } from "string-strip-html";
-
 dotenv.config();
+
 const app = express();
 app.use(express.json());
 app.use(cors());
